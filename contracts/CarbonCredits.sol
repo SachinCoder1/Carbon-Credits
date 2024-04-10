@@ -19,4 +19,32 @@ contract CarbonCredits is ERC721URIStorage, AccessControl {
         _setupRole(VERIFIER_ROLE, msg.sender);
     }
 
+    // Mint a new carbon credit token
+    function mintToken(
+        address to,
+        string memory tokenURI
+    ) public onlyRole(VERIFIER_ROLE) returns (uint256) {
+        uint256 newTokenId = _currentTokenId;
+        _mint(to, newTokenId);
+        _setTokenURI(newTokenId, tokenURI);
+        _verified[newTokenId] = false;
+        _currentTokenId++;
+        return newTokenId;
+    }
+
+    // Verify a carbon credit token
+    function verifyToken(uint256 tokenId) public onlyRole(VERIFIER_ROLE) {
+        require(
+            _exists(tokenId),
+            "CarbonCredits: verification for nonexistent token"
+        );
+        _verified[tokenId] = true;
+        emit Verified(tokenId, msg.sender);
+    }
+
+    // Check verification status
+    function isVerified(uint256 tokenId) public view returns (bool) {
+        require(_exists(tokenId), "CarbonCredits: query for nonexistent token");
+        return _verified[tokenId];
+    }
 }
