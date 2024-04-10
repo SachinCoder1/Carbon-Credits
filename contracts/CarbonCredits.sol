@@ -47,4 +47,15 @@ contract CarbonCredits is ERC721URIStorage, AccessControl {
         require(_exists(tokenId), "CarbonCredits: query for nonexistent token");
         return _verified[tokenId];
     }
+
+        // Transfer hook to enforce verification before trading
+    function _beforeTokenTransfer(address from, address to, uint256 tokenId)
+        internal
+        override
+        virtual
+    {
+        super._beforeTokenTransfer(from, to, tokenId);
+        require(_verified[tokenId], "CarbonCredits: unverified token");
+    }
+
 }
