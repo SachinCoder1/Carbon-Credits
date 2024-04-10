@@ -1,13 +1,12 @@
-# Sample Hardhat Project
+# Carbon Credits
 
-This project demonstrates a basic Hardhat use case. It comes with a sample contract, a test for that contract, and a Hardhat Ignition module that deploys that contract.
+Tokenized Carbon Credits Trading Platform: This idea has strong potential due to its relevance in today's eco-conscious market. It addresses a real and urgent global need—carbon footprint reduction—while leveraging the blockchain for transparency and security in transactions. Given the increasing focus on environmental sustainability and the growing market for carbon credits, a decentralized platform on Arbitrum could attract significant attention from both investors and environmentalists. Its success hinges on offering an accessible, efficient, and transparent platform for trading carbon credits, which could set a new standard in the environmental sector.
 
-Try running some of the following tasks:
+Try running tasks:
 
 ```shell
-npx hardhat help
+npm i
 npx hardhat test
-REPORT_GAS=true npx hardhat test
 npx hardhat node
-npx hardhat ignition deploy ./ignition/modules/Lock.js
+npx hardhat ignition deploy ./ignition/modules/CarbonCredit.js
 ```
