@@ -1,61 +1,80 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.4;
+pragma solidity 0.8.20;
 
-import "@openzeppelin/contracts/token/ERC721/extensions/ERC721URIStorage.sol";
-import "@openzeppelin/contracts/access/AccessControl.sol";
+import "@openzeppelin/contracts/token/ERC20/extensions/ERC20Burnable.sol";
+import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
 
-contract CarbonCredits is ERC721URIStorage, AccessControl {
-    uint256 private _currentTokenId = 0;
-    bytes32 public constant VERIFIER_ROLE = keccak256("VERIFIER_ROLE");
+contract CarbonCredits is ERC20Burnable, ReentrancyGuard, Ownable {
+    uint256 public pricePerCredit;  // Price per carbon credit in wei
 
-    // Mapping from token ID to its verification status
-    mapping(uint256 => bool) private _verified;
-
-    // Event to emit when a token is verified
-    event Verified(uint256 tokenId, address verifier);
-
-    constructor() ERC721("Decentralized Carbon Credits", "DCC") {
-        _setupRole(DEFAULT_ADMIN_ROLE, msg.sender);
-        _setupRole(VERIFIER_ROLE, msg.sender);
+    // Struct for holding order details
+    struct Order {
+        address user;
+        uint256 amount;
+        bool isBuyOrder;  // true for buy order, false for sell order
+        uint256 price;    // price per credit at the time of order
     }
 
-    // Mint a new carbon credit token
-    function mintToken(
-        address to,
-        string memory tokenURI
-    ) public onlyRole(VERIFIER_ROLE) returns (uint256) {
-        uint256 newTokenId = _currentTokenId;
-        _mint(to, newTokenId);
-        _setTokenURI(newTokenId, tokenURI);
-        _verified[newTokenId] = false;
-        _currentTokenId++;
-        return newTokenId;
+    Order[] public orders;  // Array to store orders
+
+    // Event declarations
+    event OrderPlaced(uint256 indexed orderId, address indexed user, bool isBuyOrder, uint256 amount, uint256 price);
+    event OrderFulfilled(uint256 indexed orderId, address indexed fulfiller);
+
+    // Constructor to set initial supply and token details
+    constructor() ERC20("Arbitrum Carbon Credit", "ACC") Ownable(msg.sender) {
+        _mint(msg.sender, 1000 * (10 ** decimals()));
+        pricePerCredit = 100* (10 ** 18);
     }
 
-    // Verify a carbon credit token
-    function verifyToken(uint256 tokenId) public onlyRole(VERIFIER_ROLE) {
-        require(
-            _exists(tokenId),
-            "CarbonCredits: verification for nonexistent token"
-        );
-        _verified[tokenId] = true;
-        emit Verified(tokenId, msg.sender);
+    // Function to buy credits, overridden to include minting
+    function buyCredits(uint256 amount) public payable {
+        uint256 totalCost = pricePerCredit * amount;
+        require(msg.value == totalCost, "Incorrect ETH amount");
+        _mint(msg.sender, amount);
+        emit Transfer(address(0), msg.sender, amount);
     }
 
-    // Check verification status
-    function isVerified(uint256 tokenId) public view returns (bool) {
-        require(_exists(tokenId), "CarbonCredits: query for nonexistent token");
-        return _verified[tokenId];
+    // Function to place a buy or sell order
+    function placeOrder(uint256 amount, bool isBuyOrder) public payable {
+        uint256 orderId = orders.length;
+        uint256 currentPrice = isBuyOrder ? pricePerCredit : pricePerCredit;  // Simplified for demo; could be dynamic
+
+        if (isBuyOrder) {
+            require(msg.value == amount * currentPrice, "Incorrect value sent");
+        } else {
+            _burn(msg.sender, amount);
+        }
+
+        orders.push(Order({
+            user: msg.sender,
+            amount: amount,
+            isBuyOrder: isBuyOrder,
+            price: currentPrice
+        }));
+
+        emit OrderPlaced(orderId, msg.sender, isBuyOrder, amount, currentPrice);
     }
 
-        // Transfer hook to enforce verification before trading
-    function _beforeTokenTransfer(address from, address to, uint256 tokenId)
-        internal
-        override
-        virtual
-    {
-        super._beforeTokenTransfer(from, to, tokenId);
-        require(_verified[tokenId], "CarbonCredits: unverified token");
+    // Function to fulfill orders
+    function fulfillOrder(uint256 orderId) public nonReentrant {
+        Order storage order = orders[orderId];
+        require(order.amount > 0, "Order already fulfilled");
+
+        if (order.isBuyOrder) {
+            require(msg.sender != order.user, "Order creator cannot fulfill their own buy order");
+            transferFrom(msg.sender, order.user, order.amount);
+        } else {
+            _mint(msg.sender, order.amount);
+        }
+
+        order.amount = 0;  // Mark as fulfilled
+        emit OrderFulfilled(orderId, msg.sender);
     }
 
+    // Administrative functions to adjust the price
+    function setPricePerCredit(uint256 newPrice) public onlyOwner {
+        pricePerCredit = newPrice;
+    }
 }
